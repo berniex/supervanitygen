@@ -1,3 +1,5 @@
+
+
 /* vanitygen.c - Super Vanitygen - Vanity Bitcoin address generator */
 
 // Copyright (C) 2016 Byron Stanoszek  <gandalf@winds.org>
@@ -42,6 +44,7 @@ static int num_patterns;
 static bool keep_going;
 static bool quiet;
 static bool verbose;
+static int out_count=1;
 
 /* Difficulty (1 in x) */
 static double difficulty;
@@ -97,6 +100,12 @@ int main(int argc, char *argv[])
         quiet=1;
         verbose=0;
         break;
+      case 'c':  /* Count Results */
+        parse_arg();
+        out_count=atoi(arg);
+	keep_going=1;
+	quiet=1;
+        goto end_arg;
       case 't':  /* #Threads */
         parse_arg();
         threads=RANGE(atoi(arg), 1, ncpus*2);
@@ -117,8 +126,9 @@ int main(int argc, char *argv[])
                 "Usage: %s [options] prefix ...\n"
                 "Options:\n"
                 "  -k      Keep going even after the first match is found\n"
-                "  -q      Be quiet (only report solutions)\n"
+                "  -q      Be quiet (only report solutions. Key and Address pairs are comma-separated in a single string for easy export)\n"
                 "  -t num  Run 'num' threads; default=%d\n"
+                "  -c num  How many addresses to generate. Results are listed in quiet mode.\n"
                 "  -v      Be verbose\n\n",
                 *argv, threads);
         fprintf(stderr, "Super Vanitygen v" MY_VERSION "\n");
@@ -343,21 +353,36 @@ static void announce_result(const u8 result[52])
   memcpy(priv_block+34, checksum, 4);
 
   b58enc(wif, priv_block, 38);
-  printf("Private Key:   %s\n", wif);
+
+  if (!quiet)
+    printf("Private Key:   %s\n", wif);
+
+  if (quiet)
+    printf("%s,", wif);
 
   /* Convert Public Key to Compressed WIF */
 
   /* Set up sha256 block for hashing the public key; length of 21 bytes */
   sha256_prepare(pub_block, 21);
   memcpy(pub_block+1, result+32, 20);
-
+  
   /* Compute checksum and copy first 4-bytes to end of public key */
   sha256_hash(cksum_block, pub_block);
   sha256_hash(checksum, cksum_block);
   memcpy(pub_block+21, checksum, 4);
 
   b58enc(wif, pub_block, 25);
-  printf("Address:       %s\n", wif);
+
+  if (!quiet)
+    printf("Address:       %s\n", wif);
+
+  if (quiet)
+    printf("%s\n", wif);
+
+  out_count--;
+  /* Exit if we only requested one key */
+  if(out_count < 1)
+    exit(0);
 
   /* Exit if we only requested one key */
   if(!keep_going)
